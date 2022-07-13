@@ -47,6 +47,7 @@
 #import "NSDictionary+Extensions.h"
 #import "NSString+Extensions.h"
 #import "OfficeFileFormats.h"
+#import "ASCLinguist.h"
 #import "mac_application.h"
 
 #pragma mark -
@@ -485,7 +486,13 @@ public:
                                     if ( urlPage.path )
                                         [entrypage insertString:urlPage.path atIndex:0];
 
-                                    urlPage.path = entrypage;
+                                    NSRange pathrange = [entrypage rangeOfString:@"?"];
+                                    if ( pathrange.location != NSNotFound ) {
+                                        urlPage.path = [entrypage substringToIndex:pathrange.location];
+                                        urlPage.query = [entrypage substringFromIndex:pathrange.location+1];
+                                    } else {
+                                        urlPage.path = entrypage;
+                                    }
                                 }
 
                                 NSURLQueryItem *countryCode = [NSURLQueryItem queryItemWithName:@"lang" value:[[[NSLocale currentLocale] objectForKey:NSLocaleLanguageCode] lowercaseString]];
@@ -496,7 +503,9 @@ public:
 
                                 NSURLQueryItem *portalAddress = [NSURLQueryItem queryItemWithName:@"desktop" value:@"true"];
 
-                                urlPage.queryItems            = @[countryCode, portalAddress];
+                                NSMutableArray * qitems = urlPage.queryItems ? [NSMutableArray arrayWithArray:urlPage.queryItems] : [[NSMutableArray alloc] init];
+                                [qitems addObjectsFromArray:@[countryCode, portalAddress]];
+                                urlPage.queryItems = qitems;
 
                                 [[NSNotificationCenter defaultCenter] postNotificationName:CEFEventNameCreateTab
                                                                                     object:nil
@@ -604,8 +613,7 @@ public:
                                 }
                                 
                                 if (NSString * langId = json[@"langid"]) {
-                                    [[NSUserDefaults standardUserDefaults] setObject:langId forKey:ASCUserUILanguage];
-                                    [[NSUserDefaults standardUserDefaults] synchronize];
+                                    [ASCLinguist setAppLanguageCode:langId];
                                 }
 
                                 if (NSString * userName = json[@"username"]) {
@@ -624,6 +632,8 @@ public:
                                     if ([docopenMode isEqualToString:@"view"]) {
                                         [params addObject:[NSString stringWithFormat:@"mode=%@", @"view"]];
                                     }
+                                    [[NSUserDefaults standardUserDefaults] setObject:docopenMode forKey:@"asc_user_docOpenMode"];
+                                    [[NSUserDefaults standardUserDefaults] synchronize];
                                 }
 
                                 if (NSString * uiTheme = json[@"uitheme"]) {
@@ -662,8 +672,10 @@ public:
                                 docType = ASCDocumentTypeSpreadsheet;
                             } else if ([nsParam isEqualToString:@"slide"]) {
                                 docType = ASCDocumentTypePresentation;
+                            } else if ([nsParam isEqualToString:@"form"]) {
+                                docType = ASCDocumentTypeForm;
                             }
-                            
+
                             if (docType != ASCDocumentTypeUnknown) {
                                 [[NSNotificationCenter defaultCenter] postNotificationName:CEFEventNameCreateTab
                                                                                     object:nil

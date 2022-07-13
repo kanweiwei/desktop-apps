@@ -122,7 +122,7 @@ CMainWindow::CMainWindow(QRect& rect) :
     wcx.cbWndExtra	= 0;
     wcx.lpszClassName = WINDOW_CLASS_NAME;
 //    wcx.hbrBackground = CreateSolidBrush(WINDOW_BACKGROUND_COLOR);
-    wcx.hbrBackground = CreateSolidBrush(AscAppManager::themes().colorRef(CThemes::ColorRole::ecrWindowBackground));
+    wcx.hbrBackground = CreateSolidBrush(AscAppManager::themes().current().colorRef(CTheme::ColorRole::ecrWindowBackground));
     wcx.hCursor = LoadCursor( hInstance, IDC_ARROW );
 
     QIcon icon = Utils::appIcon();
@@ -143,7 +143,11 @@ CMainWindow::CMainWindow(QRect& rect) :
     m_pWinPanel = new CWinPanel(this);
 
     m_pMainPanel = new CMainPanelImpl(m_pWinPanel, true, m_dpiRatio);
+#ifdef __OS_WIN_XP
+    m_pMainPanel->setStyleSheet(AscAppManager::getWindowStylesheets(m_dpiRatio) + "QTabBar::scroller{width:16px;}");
+#else
     m_pMainPanel->setStyleSheet(AscAppManager::getWindowStylesheets(m_dpiRatio));
+#endif
     m_pMainPanel->updateScaling(m_dpiRatio);
     m_pMainPanel->goStart();
 
@@ -162,18 +166,20 @@ CMainWindow::~CMainWindow()
 {
     closed = true;
 
-    WINDOWPLACEMENT wp{sizeof(WINDOWPLACEMENT)};
-    if (GetWindowPlacement(hWnd, &wp)) {
-        GET_REGISTRY_USER(reg_user)
-        wp.showCmd == SW_MAXIMIZE ?
-                    reg_user.setValue("maximized", true) : reg_user.remove("maximized");
+    if ( isVisible() ) {
+        WINDOWPLACEMENT wp{sizeof(WINDOWPLACEMENT)};
+        if (GetWindowPlacement(hWnd, &wp)) {
+            GET_REGISTRY_USER(reg_user)
+            wp.showCmd == SW_MAXIMIZE ?
+                        reg_user.setValue("maximized", true) : reg_user.remove("maximized");
 
-        QRect windowRect;
-        windowRect.setTopLeft(QPoint(wp.rcNormalPosition.left, wp.rcNormalPosition.top));
-        windowRect.setBottomRight(QPoint(wp.rcNormalPosition.right, wp.rcNormalPosition.bottom));
-        windowRect.adjust(0,0,-1,-1);
+            QRect windowRect;
+            windowRect.setTopLeft(QPoint(wp.rcNormalPosition.left, wp.rcNormalPosition.top));
+            windowRect.setBottomRight(QPoint(wp.rcNormalPosition.right, wp.rcNormalPosition.bottom));
+            windowRect.adjust(0,0,-1,-1);
 
-        reg_user.setValue("position", windowRect);
+            reg_user.setValue("position", windowRect);
+        }
     }
 
     hide();
@@ -198,8 +204,10 @@ LRESULT CALLBACK CMainWindow::WndProc( HWND hWnd, UINT message, WPARAM wParam, L
                 window->m_dpiRatio = dpi_ratio;
                 refresh_window_scaling_factor(window);
                 window->adjustGeometry();
-
             }
+        } else
+        if ( AscAppManager::IsUseSystemScaling() ) {
+            window->updateScaling();
         }
 
         qDebug() << "WM_DPICHANGED: " << LOWORD(wParam);
@@ -472,7 +480,8 @@ qDebug() << "WM_CLOSE";
             window->adjustGeometry();
         }
 #else
-        window->updateScaling();
+        if ( !AscAppManager::IsUseSystemScaling() )
+            window->updateScaling();
 #endif
 
         break;
@@ -490,9 +499,9 @@ qDebug() << "WM_CLOSE";
         PAINTSTRUCT ps;
         HDC hDC = ::BeginPaint(hWnd, &ps);
         HPEN hpenOld = static_cast<HPEN>(::SelectObject(hDC, ::GetStockObject(DC_PEN)));
-        ::SetDCPenColor(hDC, AscAppManager::themes().colorRef(CThemes::ColorRole::ecrWindowBorder));
+        ::SetDCPenColor(hDC, AscAppManager::themes().current().colorRef(CTheme::ColorRole::ecrWindowBorder));
 
-        HBRUSH hBrush = ::CreateSolidBrush(AscAppManager::themes().colorRef(CThemes::ColorRole::ecrWindowBackground));
+        HBRUSH hBrush = ::CreateSolidBrush(AscAppManager::themes().current().colorRef(CTheme::ColorRole::ecrWindowBackground));
         HBRUSH hbrushOld = static_cast<HBRUSH>(::SelectObject(hDC, hBrush));
 
         ::Rectangle(hDC, rect.left, rect.top, rect.right, rect.bottom);
@@ -793,6 +802,8 @@ void CMainWindow::slot_mainPageReady()
     CSplash::hideSplash();
 
 #ifdef _UPDMODULE
+    GET_REGISTRY_SYSTEM(reg_system)
+
     OSVERSIONINFO osvi;
 
     ZeroMemory(&osvi, sizeof(OSVERSIONINFO));
@@ -801,7 +812,7 @@ void CMainWindow::slot_mainPageReady()
     GetVersionEx(&osvi);
 
     // skip updates for XP
-    if ( osvi.dwMajorVersion > 5 ) {
+    if ( osvi.dwMajorVersion > 5 && reg_system.value("CheckForUpdates", true).toBool() ) {
         win_sparkle_set_lang(CLangater::getCurrentLangCode().toLatin1());
 
         const std::wstring argname{L"--updates-appcast-url"};
