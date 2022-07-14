@@ -15,16 +15,14 @@ namespace Kde
     } Mode;
 
     QStringList openNativeDialog(QWidget *parent,
-                             const QString &name,
-                             const QString &path,
-                             const QString &filter,
-                             const QString &sel_filter,
-                             bool sel_multiple);
-    QStringList saveNativeDialog(QWidget *parent,
-                             const QString &name,
-                             const QString &file_name,
-                             const QString &filter,
-                             const QString &sel_filter);
+                                 Mode mode,
+                                 const QString &name,
+                                 const QString &file_name,
+                                 const QString &path,
+                                 const QString &filter,
+                                 const QString &sel_filter,
+                                 bool sel_multiple = false);
+
     void setParent(const long &childId, const long &parentId);
 
     extern "C"

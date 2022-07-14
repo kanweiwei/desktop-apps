@@ -322,7 +322,8 @@ bool CFileDialogWrapper::modalSaveAs(QString& fileName, int selected)
 #ifdef __linux__
         if (WindowHelper::getEnvInfo() == "KDE") {
             QWidget *prnt = qobject_cast<QWidget*>(parent());
-            QStringList result = Kde::saveNativeDialog(prnt, tr("Save As"), n, f, sf);
+            QStringList result = Kde::openNativeDialog(prnt, Kde::Mode::SAVE, tr("Save As"),
+                                                       n, "", f, sf);
             return (result.size() > 0) ? result.at(0) : QString();
         }
 #endif
@@ -435,7 +436,8 @@ QStringList CFileDialogWrapper::modalOpen(const QString& path, const QString& fi
 
     if (WindowHelper::getEnvInfo() == "KDE") {
         QWidget *prnt = qobject_cast<QWidget*>(parent());
-        return Kde::openNativeDialog(prnt, tr("Open Document"), path, _filter_, _sel_filter, multi);
+        return Kde::openNativeDialog(prnt, Kde::Mode::OPEN, tr("Open Document"), "",
+                                     path, _filter_, _sel_filter, multi);
     }
     return multi ? QFileDialog::getOpenFileNames(_parent, tr("Open Document"), path, _filter_, &_sel_filter, _opts) :
                 QStringList(QFileDialog::getOpenFileName(_parent, tr("Open Document"), path, _filter_, &_sel_filter, _opts));

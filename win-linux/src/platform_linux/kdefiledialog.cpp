@@ -9,7 +9,9 @@ extern "C" {
 
 
 QStringList Kde::openNativeDialog(QWidget *parent,
+                              Mode mode,
                               const QString &name,
+                              const QString &file_name,
                               const QString &path,
                               const QString &filter,
                               const QString &sel_filter,
@@ -21,51 +23,15 @@ QStringList Kde::openNativeDialog(QWidget *parent,
     int files_count = 0;
     long parentId = (parent) ? (long)parent->winId() : 0L;
     nativeFileDialog(parentId,
-                     Mode::OPEN,
-                     &filenames,
-                     &files_count,
-                     name.toLocal8Bit().data(),
-                     "",
-                     path.toLocal8Bit().data(),
-                     filter.toLocal8Bit().data(),
-                     sel_filter.toLocal8Bit().data(),
-                     sel_multiple);
-
-    for (int i = 0; i < files_count; i++) {
-        //printf("\n%s  %d\n", filenames[i], files_count);
-        if (filenames[i]) {
-            files.append(QString::fromUtf8(filenames[i]));
-            free(filenames[i]);
-        }
-    }
-    if (filenames) {
-        free(filenames);
-    }
-
-    return files;
-}
-
-QStringList Kde::saveNativeDialog(QWidget *parent,
-                               const QString &name,
-                               const QString &file_name,
-                               const QString &filter,
-                               const QString &sel_filter)
-{
-    qputenv("GTK_USE_PORTAL", "1");
-    QStringList files;
-    char **filenames = nullptr;
-    int files_count = 0;
-    long parentId = (parent) ? (long)parent->winId() : 0L;
-    nativeFileDialog(parentId,
-                     Mode::SAVE,
+                     mode,
                      &filenames,
                      &files_count,
                      name.toLocal8Bit().data(),
                      file_name.toLocal8Bit().data(),
-                     "",
+                     path.toLocal8Bit().data(),
                      filter.toLocal8Bit().data(),
                      sel_filter.toLocal8Bit().data(),
-                     false);
+                     sel_multiple);
 
     for (int i = 0; i < files_count; i++) {
         //printf("\n%s  %d\n", filenames[i], files_count);
