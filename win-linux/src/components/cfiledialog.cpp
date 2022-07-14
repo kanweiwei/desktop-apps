@@ -318,10 +318,13 @@ bool CFileDialogWrapper::modalSaveAs(QString& fileName, int selected)
             _opts |= QFileDialog::DontUseNativeDialog;
 #else
 #endif
+
+#ifdef __linux__
         if (WindowHelper::getEnvInfo() == "KDE") {
             QStringList result = Kde::saveNativeDialog(p, tr("Save As"), n, f, sf);
             return (result.size() > 0) ? result.at(0) : QString();
         }
+#endif
         return QFileDialog::getSaveFileName(p, tr("Save As"), n, f, &sf, _opts);
     };
 
