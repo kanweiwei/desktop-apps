@@ -182,9 +182,9 @@ void Kde::nativeFileDialog(Mode mode,
             *files_count = f_ind;
             *filenames = (char**)calloc((size_t)(*files_count), sizeof(char*));
             for (int i = 0; f_iter = g_slist_nth(filenames_list, i); i++) {
-                (*filenames)[i] = (char*)f_iter->data;
+                (*filenames)[i] = strdup((char*)f_iter->data);
             }
-
+            g_slist_free(filenames_list);
         } else {
             *files_count = 1;
             *filenames = (char**)calloc((size_t)(*files_count), sizeof(char*));
