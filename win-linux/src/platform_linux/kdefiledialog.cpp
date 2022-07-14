@@ -4,6 +4,8 @@ extern "C" {
 #include <gtk/gtk.h>
 }
 #include "kdefiledialog.h"
+#include <QWindow>
+#include <gdk/gdkx.h>
 
 
 QStringList Kde::openNativeDialog(QWidget *parent,
@@ -17,7 +19,9 @@ QStringList Kde::openNativeDialog(QWidget *parent,
     QStringList files;
     char **filenames = nullptr;
     int files_count = 0;
-    nativeFileDialog(Mode::OPEN,
+    long parentId = (parent) ? (long)parent->winId() : 0L;
+    nativeFileDialog(parentId,
+                     Mode::OPEN,
                      &filenames,
                      &files_count,
                      name.toLocal8Bit().data(),
@@ -51,7 +55,9 @@ QStringList Kde::saveNativeDialog(QWidget *parent,
     QStringList files;
     char **filenames = nullptr;
     int files_count = 0;
-    nativeFileDialog(Mode::SAVE,
+    long parentId = (parent) ? (long)parent->winId() : 0L;
+    nativeFileDialog(parentId,
+                     Mode::SAVE,
                      &filenames,
                      &files_count,
                      name.toLocal8Bit().data(),
@@ -73,6 +79,14 @@ QStringList Kde::saveNativeDialog(QWidget *parent,
     }
 
     return files;
+}
+
+void Kde::setParent(const long &childId, const long &parentId)
+{
+    QWindow *wnd = QWindow::fromWinId((WId)childId);
+    wnd->setFlags(Qt::Window);
+    wnd->setModality(Qt::WindowModal);
+    wnd->setParent(QWindow::fromWinId((WId)parentId));
 }
 
 // Extern "C"
@@ -101,7 +115,8 @@ void Kde::parseString(GSList** list,
     free(_str);
 }
 
-void Kde::nativeFileDialog(Mode mode,
+void Kde::nativeFileDialog(const long &parentId,
+                           Mode mode,
                            char*** filenames,
                            int* files_count,
                            const char* name,
@@ -112,11 +127,25 @@ void Kde::nativeFileDialog(Mode mode,
                            bool sel_multiple)
 {
     gtk_init(NULL, NULL);
+
+    GtkWindow *native_parent = (GtkWindow*)gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_default_size (native_parent, 0, 0);
+    gtk_window_set_position(native_parent, GTK_WIN_POS_CENTER);
+    gtk_window_set_title(native_parent, "");
+    gtk_widget_show_all ((GtkWidget*)native_parent);
+    GdkWindow *gdk_parent = gtk_widget_get_window(GTK_WIDGET(native_parent));
+    gdk_window_set_opacity(gdk_parent, 0.0);
+
+    if (parentId != 0L) {
+        Window parent_wnd = (Window)parentId;
+        Window gdk_parent_wnd = GDK_WINDOW_XID(gdk_parent);
+        setParent((long)gdk_parent_wnd, (long)parent_wnd);
+    }
+
     GtkFileChooserNative *native;
     GtkFileFilter *filter;
-    gpointer window = NULL;    
     native = gtk_file_chooser_native_new(name,
-                                         GTK_WINDOW(window),
+                                         native_parent,
                                          mode == Mode::OPEN ? GTK_FILE_CHOOSER_ACTION_OPEN :
                                                               GTK_FILE_CHOOSER_ACTION_SAVE,
                                          mode == Mode::OPEN ? "_Open" : "_Save",
@@ -124,6 +153,8 @@ void Kde::nativeFileDialog(Mode mode,
 
     GtkFileChooser *chooser = GTK_FILE_CHOOSER(native);
     gtk_native_dialog_set_modal(GTK_NATIVE_DIALOG(native), TRUE);
+    g_signal_connect(G_OBJECT(native_parent), "destroy", G_CALLBACK(gtk_main_quit), NULL);
+
     if (mode == Mode::OPEN) {
         gtk_file_chooser_set_current_folder(chooser, path);
         gtk_file_chooser_set_select_multiple (chooser, sel_multiple ? TRUE : FALSE);
@@ -132,7 +163,6 @@ void Kde::nativeFileDialog(Mode mode,
         gtk_file_chooser_set_current_name(chooser, file);
         //gtk_file_chooser_set_filename(chooser, "existing_filename");
     }
-    //g_signal_connect(native, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
     // Filters
     GSList *list = NULL, *iter = NULL;
@@ -171,15 +201,12 @@ void Kde::nativeFileDialog(Mode mode,
         }
     }
 
-    //gdk_window_raise(gtk_widget_get_window((GtkWidget*)(native)));
     gint res = gtk_native_dialog_run(GTK_NATIVE_DIALOG(native));
     if (res == GTK_RESPONSE_ACCEPT) {
         if (sel_multiple) {
             GSList *filenames_list = gtk_file_chooser_get_filenames(chooser);
             GSList *f_iter = NULL;
-            int f_ind;
-            for (f_ind = 0; f_iter = g_slist_nth(filenames_list, f_ind); f_ind++);
-            *files_count = f_ind;
+            *files_count = (int)g_slist_length(filenames_list);
             *filenames = (char**)calloc((size_t)(*files_count), sizeof(char*));
             for (int i = 0; f_iter = g_slist_nth(filenames_list, i); i++) {
                 (*filenames)[i] = strdup((char*)f_iter->data);
@@ -190,9 +217,9 @@ void Kde::nativeFileDialog(Mode mode,
             *filenames = (char**)calloc((size_t)(*files_count), sizeof(char*));
             **filenames = gtk_file_chooser_get_filename(chooser);
         }
-
     }
     g_object_unref(native);
+    gtk_window_close(native_parent);
     g_slist_free(list);
-    //gtk_main();
+    gtk_main();
 }

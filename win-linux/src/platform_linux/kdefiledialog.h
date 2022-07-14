@@ -25,6 +25,7 @@ namespace Kde
                              const QString &file_name,
                              const QString &filter,
                              const QString &sel_filter);
+    void setParent(const long &childId, const long &parentId);
 
     extern "C"
     {
@@ -32,7 +33,8 @@ namespace Kde
     void parseString(GSList** list,
                      const char* str,
                      const char* delim);
-    void nativeFileDialog(Mode mode,
+    void nativeFileDialog(const long &parentId,
+                          Mode mode,
                           char*** filenames,
                           int* files_count,
                           const char* name,
